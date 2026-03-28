@@ -57,6 +57,28 @@ export const worldCatalog = [
     childIds: ['australia', 'new_zealand'],
     pageSize: 9, status: 'planned', isUnlockedByDefault: false,
   },
+  {
+    type: 'continent', id: 'antarctica', parentId: null,
+    name: '南极洲', nameEn: 'Antarctica', sortOrder: 7, themeColor: '#AED6F1',
+    childType: 'country',
+    childIds: [],
+    pageSize: 9, status: 'planned', isUnlockedByDefault: false,
+  },
+  // ── 特殊入口（非洲级，但在主页 3x3 中占位） ──
+  {
+    type: 'continent', id: 'mashup', parentId: null,
+    name: '主题大混战', nameEn: 'World Mashup', sortOrder: 8, themeColor: '#E74C3C',
+    childType: null,
+    childIds: [],
+    pageSize: 9, status: 'active', isUnlockedByDefault: false,
+  },
+  {
+    type: 'continent', id: 'coming_soon', parentId: null,
+    name: '敬请期待', nameEn: 'Coming Soon', sortOrder: 9, themeColor: '#BDC3C7',
+    childType: null,
+    childIds: [],
+    pageSize: 9, status: 'active', isUnlockedByDefault: false,
+  },
 
   // ═══════════════════════════════════════
   // 亚洲国家（18 国）
