@@ -3,7 +3,7 @@
 > 创建日期：2026-03-28
 > 项目仓库：https://github.com/manpengan/wechat-minigame
 > 标准流程：~/pro/kb/workflows/standard-dev-process/SKILL.md
-> 当前阶段：Phase 1 立项（待开始）
+> 当前阶段：Phase 7 开发实现（进行中）
 
 ---
 
@@ -38,13 +38,13 @@ Phase 6 ──→ Phase 7 ──→ Phase 8 ──→ Phase 9 ──→ Phase 10
 
 | 阶段 | 状态 | 产出文档 | 备注 |
 |------|------|----------|------|
-| Phase 1 立项 | ⏳ 待开始 | docs/01-project-charter.md | |
+| Phase 1 立项 | ✅ 已完成 | docs/01-project-charter.md | 方向确定为城市抓猫猫，5 项决策已锁定 |
 | Phase 2 市场调研 | 🔒 未开始 | docs/02-market-research.md | |
 | Phase 3 需求分析 | 🔒 未开始 | docs/03-prd.md | |
-| Phase 4 技术方案 | 🔒 未开始 | docs/04-technical-design.md | |
+| Phase 4 技术方案 | ✅ 已完成 | docs/04-technical-design.md | 04-city-content-system + 05-difficulty-generator |
 | Phase 5 项目计划 | 🔒 未开始 | docs/05-project-plan.md | |
 | Phase 6 设计阶段 | 🔒 未开始 | docs/06-design-spec.md | |
-| Phase 7 开发实现 | 🔒 未开始 | docs/07-dev-notes.md | |
+| Phase 7 开发实现 | 🔧 进行中 | docs/07-dev-notes.md | Codex 落代码骨架 js/content/* |
 | Phase 8 测试验收 | 🔒 未开始 | docs/08-test-report.md | |
 | Phase 9 发布上线 | 🔒 未开始 | docs/09-release-checklist.md | |
 | Phase 10 运营迭代 | 🔒 未开始 | docs/10-operations.md | |
