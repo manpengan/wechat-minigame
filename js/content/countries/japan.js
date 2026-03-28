@@ -1,7 +1,6 @@
-export const japanCities = {
-  countryId: 'japan',
-  cityIds: ['tokyo', 'osaka', 'kyoto', 'sapporo'],
-  // 4 城市，1 页
-}
-
+/**
+ * @deprecated 国家城市列表已移入 navigation/future-catalog.js
+ */
+import { asiaCountryPlan } from '../navigation/future-catalog.js'
+export const japanCities = asiaCountryPlan.find(c => c.id === 'japan')
 export default japanCities
