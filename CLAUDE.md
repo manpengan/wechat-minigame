@@ -3,9 +3,9 @@
 <!-- BRIEFING: auto-maintained, do not edit manually -->
 ## 项目速览
 - **项目**：城市抓猫猫 — 城市主题堆叠三消微信小游戏
-- **阶段**：Phase 1 立项完成，待锁定 5 项设计决策后进入 Phase 2
-- **上次结论**：立项书 + 游戏设计 + 内容管线 3 份文档完成
-- **下一步**：锁定待决策项 → Codex 补充系统设计 → Phase 2 竞品深度调研
+- **阶段**：Phase 1 立项 + Phase 4 技术方案完成，5 项决策待锁定
+- **上次结论**：5 份文档完成（charter/game-design/content-pipeline/city-content-system/difficulty-generator），Codex review 修复完毕
+- **下一步**：锁定 5 项待决策 → Codex 落代码骨架（js/content/* + 关卡生成器）→ 进入开发
 - **开发流程**：10 阶段门禁制（~/pro/kb/workflows/standard-dev-process/SKILL.md）
 - **关键约束**：Canvas 渲染 | 首包 4MB | 无 DOM/BOM | 60fps | 纯手写框架无引擎
 - **KB 指针**：~/pro/kb/projects/wechat-minigame/
