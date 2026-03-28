@@ -3,9 +3,10 @@
 <!-- BRIEFING: auto-maintained, do not edit manually -->
 ## 项目速览
 - **项目**：wechat-minigame — 微信小游戏
-- **阶段**：初始化
-- **上次结论**：项目初始化
-- **下一步**：与 Codex 讨论游戏类型、玩法设计和技术方案
+- **阶段**：Phase 1 立项（待开始）
+- **上次结论**：项目初始化 + 标准开发流程接入
+- **下一步**：Phase 1 立项 — 确定游戏类型、目标用户、项目愿景
+- **开发流程**：10 阶段门禁制（~/pro/kb/workflows/standard-dev-process/SKILL.md）
 - **关键约束**：Canvas 渲染 | 首包 4MB | 无 DOM/BOM | 60fps 目标
 - **KB 指针**：~/pro/kb/projects/wechat-minigame/
 <!-- END BRIEFING -->
@@ -26,6 +27,7 @@ project.config.json  # DevTools 项目配置
 js/                  # 游戏逻辑
 images/              # 图片素材
 audio/               # 音频素材
+docs/                # 阶段文档（00-10）
 ```
 
 ## 平台约束
