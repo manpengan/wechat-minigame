@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# WeChat DevTools
+node_modules/
+miniprogram_npm/
+*.wasm
+
+# Build
+dist/
+
+# Environment
+.env
+.env.local
