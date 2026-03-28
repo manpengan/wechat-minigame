@@ -15,7 +15,7 @@ module.exports = {
   continent: 'asia',
   // 地图封面
   cover: {
-    catImage: 'images/cats/beijing.png',    // 猫猫头像
+    catImage: 'images/cats/cat_beijing.png', // 猫猫头像
     bgColor: '#CC2936',                      // 城市主色调
   },
   // 城市文化信息
@@ -57,7 +57,7 @@ module.exports = {
 | `elements[].name` | string | Y | 元素中文名 |
 | `elements[].category` | string | Y | 分类：`food` / `culture` / `landmark` / `nature` / `item` |
 | `elements[].image` | string | Y | 图片路径（相对于资源根目录） |
-| `levels[].piecesPerElement` | number\|number[] | Y | 3 的倍数；数组时长度须等于 `elementCount` |
+| `levels[].piecesPerElement` | number\|number[] | Y | 3 的倍数；数组时长度须等于 `elementCount`，每个值必须是 3 的倍数 |
 
 ### 1.2 洲索引配置
 
@@ -167,31 +167,111 @@ module.exports = {
 
 **难度递进规律：** 关 1-2 低密度入门 -> 关 3-4 中密度爬坡 -> 关 5-6 高密度挑战。关 6 允许 `piecesPerElement` 为数组，制造不均匀分布的额外难度。
 
-### 4.2 关卡布局生成
+### 4.2 布局生成器系统设计
 
-不手工摆放物件位置，用程序化生成器：
+#### 核心概念
 
-- **输入：** 难度参数 + 城市元素列表
-- **输出：** 每个物件的 `{ elementId, x, y, layer, rotation }`
-- **生成约束：**
-  - 每层物件不超过总数的 40%
-  - 最底层至少有 30% 的物件初始可点击
-  - 保证可解性（从目标状态反向推导）
+**Overlap Graph（遮挡图）**：
+- 每个物件是一个节点，如果物件 A 遮挡物件 B，则有一条有向边 A → B
+- 物件可点击的条件：入度为 0（没有任何物件遮挡它）
+- 遮挡判定：两个物件的包围盒重叠面积 > 阈值（物件面积的 20%）且 A.layer > B.layer
 
-### 4.3 难度验证
+**Dead-end（死局）定义**：
+- 所有可点击物件放入暂存槽后无法触发任何三消，且暂存槽已满 7 格
+- 等价条件：当前可点击物件集合中，没有任何 3 个同类物件
 
-用脚本模拟 1000 次随机合理操作，验证通关率：
+#### 生成算法（反向法）
 
-| 关卡 | 目标通关率 |
-|------|-----------|
-| 关 1 | > 95% |
-| 关 2 | > 90% |
-| 关 3 | > 80% |
-| 关 4 | > 70% |
-| 关 5 | > 60% |
-| 关 6 | 50-60% |
+```
+输入：difficulty = { elementCount, piecesPerElement, layers, density }
+输出：pieces[] = [{ elementId, x, y, layer }]
 
-失败率过高时降低 `density` 或 `layers`。
+步骤：
+1. 创建物件池：按 elementCount × piecesPerElement 生成全部物件
+2. 定义画布区域：根据 layers 划分 Z 层，每层定义可用网格
+3. 正向放置：
+   a. 从最底层（layer=0）开始，逐层往上放置物件
+   b. 每层放置数量 = 总数 × layerDistribution[layer]
+      - density='low':  [0.4, 0.3, 0.2, 0.1]
+      - density='medium': [0.3, 0.3, 0.25, 0.15]
+      - density='high': [0.25, 0.25, 0.25, 0.25]
+   c. 在层内随机放置，确保相邻物件有 overlap（按 density 控制重叠率）
+4. 构建 overlap graph
+5. 可点击性校验：初始可点击物件占比 ≥ 30%（入度为 0 的节点数 / 总节点数）
+6. 可解性验证（见 4.3）
+7. 不通过则重新生成（最多重试 50 次）
+```
+
+#### Seed（种子）
+
+- 每个关卡实例由 `seed: number` 唯一确定
+- 正式关卡：`seed = hash(cityId + levelId + attemptCount)`
+- 每日挑战：`seed = hash(dateString + 'daily')`
+- 同一 seed 保证生成完全相同的布局（可复现、可分享、可验证）
+
+#### 可点击判定规则
+
+```javascript
+function isClickable(piece, allPieces) {
+  // 同层或更高层的物件中，是否有包围盒重叠超过阈值的
+  for (const other of allPieces) {
+    if (other === piece || other.removed) continue
+    if (other.layer <= piece.layer) continue
+    if (overlapArea(piece, other) > piece.area * 0.2) {
+      return false  // 被遮挡
+    }
+  }
+  return true
+}
+```
+
+### 4.3 Solver / 可解性验证
+
+#### Solver 算法（贪心模拟）
+
+```
+输入：pieces[]（布局）, maxSimulations=1000
+输出：{ solvable: bool, avgMoves: number, passRate: number }
+
+每次模拟：
+1. 初始化暂存槽 slot[7]，旁路寄存区 bypass[3]
+2. 循环直到场景清空或暂存槽满：
+   a. 获取所有可点击物件（overlap graph 入度=0）
+   b. 优先策略：
+      - 优先选择能在暂存槽中凑成三消的物件
+      - 其次选择暂存槽中已有 1-2 个同类的物件
+      - 最后随机选择
+   c. 放入暂存槽，触发三消判定
+   d. 如果暂存槽满且无法消除 → 失败
+3. 场景清空 → 成功
+```
+
+#### 验证标准
+
+| 关卡 | 目标通关率 | 不达标处理 |
+|------|-----------|-----------|
+| 关 1 | > 95% | 降低 layers 或 density |
+| 关 2 | > 90% | 同上 |
+| 关 3 | > 80% | 减少 elementCount |
+| 关 4 | > 70% | 调整 layerDistribution |
+| 关 5 | > 60% | 同上 |
+| 关 6 | 50-60% | 在此区间即合格 |
+
+#### 死局检测
+
+```javascript
+function isDeadEnd(slot, clickablePieces) {
+  if (slot.length < 7) return false  // 槽未满，还能操作
+  // 检查可点击物件中是否有能和槽中物件凑成三消的
+  for (const piece of clickablePieces) {
+    const sameInSlot = slot.filter(s => s.elementId === piece.elementId).length
+    if (sameInSlot >= 2) return false  // 放入后可凑三消
+  }
+  return true  // 真死局
+}
+```
+
+注意：死局 ≠ 游戏失败。玩家可以使用 Undo/Remove/Shuffle 道具脱困。只有道具用尽且死局时才判定失败。
 
 ---
 
@@ -203,7 +283,7 @@ module.exports = {
 主包（<= 4MB）：
 ├── game.js + js/（核心框架、渲染引擎、游戏逻辑）    ~150KB
 ├── images/ui/（通用 UI 元素、按钮、图标）            ~300KB
-├── images/cats/beijing.png（首个城市猫猫头像）        ~50KB
+├── images/cats/cat_beijing.png（首个城市猫猫头像）     ~50KB
 ├── audio/（通用音效，6-8 个）                        ~300KB
 ├── cities/beijing.js（首个城市数据配置）               ~5KB
 └── images/elements/beijing/（首个城市元素图标）       ~200KB
@@ -214,7 +294,7 @@ module.exports = {
 └── sub-asia/
     ├── cities/tokyo.js + bangkok.js + ...
     ├── images/elements/tokyo/ + bangkok/ + ...
-    └── images/cats/tokyo.png + bangkok.png + ...
+    └── images/cats/cat_tokyo.png + cat_bangkok.png + ...
 ```
 
 ### 5.2 首包预算分配
@@ -237,7 +317,21 @@ module.exports = {
 
 ## 6. MVP 城市清单与素材计划
 
-### 6.1 首批 6 城市
+### 6.1 元素选取配比规则
+
+每个城市的 12-15 个特色元素必须覆盖以下 5 个类目，每类至少 2 个：
+
+| 类目 | category 值 | 最少数量 | 示例 |
+|------|------------|---------|------|
+| 地标建筑 | landmark | 2 | 天安门、鸟巢 |
+| 美食饮品 | food | 3 | 糖葫芦、烤鸭、豆汁 |
+| 文化符号 | culture | 2 | 京剧脸谱、兔儿爷 |
+| 交通器物 | item | 2 | 铜锣、毛笔 |
+| 动植物/自然 | nature | 2 | — |
+
+剩余 1-4 个名额自由分配。此规则确保每个城市的元素视觉多样性和辨识度。
+
+### 6.2 首批 6 城市
 
 | 城市 | 元素主题方向 | 猫猫特色 |
 |------|------------|---------|
@@ -248,7 +342,7 @@ module.exports = {
 | 新加坡 | 鱼尾狮、辣椒螃蟹、榴莲建筑、叻沙、金沙酒店、兰花、肉骨茶、冰激凌三明治、组屋、咖椰吐司 | 花猫 + 小狮子鬃毛 |
 | 伊斯坦布尔 | 土耳其红茶、蓝色清真寺、热气球、烤肉串、郁金香、恶魔之眼、土耳其冰淇淋、地毯、石榴、旋转舞裙 | 安哥拉猫 + 恶魔之眼项圈 |
 
-### 6.2 生产时间估算（单城市）
+### 6.3 生产时间估算（单城市）
 
 | 步骤 | 耗时 | 说明 |
 |------|------|------|
