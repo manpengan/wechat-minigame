@@ -160,17 +160,19 @@ MVP 只开放亚洲 6 城市，直入城市选择页，不启用完整多级导�
 | `childType` | string\|null | 子节点类型：`country` / `region` / `city` / null |
 | `childIds` | string[] | 当前可消费的子节点 id（仅已启用的） |
 | `pageSize` | number | 每页格子数，默认 9 |
-| `isEnabled` | boolean | 当前版本是否启用 |
+| `status` | string | `'active'`（当前可运行）/ `'planned'`（未来规划） |
 | `isUnlockedByDefault` | boolean | 是否默认解锁 |
 
 分页通过 `shared/pagination.js` 的 `paginate(childIds, pageSize)` 动态计算，不手写 page 常量。
+
+Framework Ready: 全量 6 洲 48 国 127 城市的 catalog 已搭好，扩城市只需加 CityManifest + 改 status 为 active。
 
 **数据文件分层：**
 
 | 文件 | 用途 | 是否进入 runtime |
 |------|------|-----------------|
-| `navigation/runtime-nav.js` | 当前版本可消费的导航节点 | ✅ 是 |
-| `navigation/future-catalog.js` | 未来版本城市/国家/地区规划 | ❌ 否 |
+| `navigation/runtime-nav.js` | 当前版本可消费的导航节点（从 world-catalog 自动过滤） | ✅ 是 |
+| `navigation/world-catalog.js` | 全量世界导航规划（含 active + planned） | ✅ 是（runtime-nav 从中过滤 active 节点） |
 | `navigation/nav-schema.js` | NavNode schema 定义 + 验证 | ✅ 是（类型定义） |
 | `docs/city-roadmap.md` | 全量 127 城市路线图 | ❌ 否 |
 
