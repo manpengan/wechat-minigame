@@ -58,12 +58,12 @@ export const chinaRegions = [
     cityIds: ['xian', 'lanzhou', 'xining', 'yinchuan', 'urumqi'],
   },
   {
-    id: 'hk_macao',
-    name: '港澳',
-    nameEn: 'HK & Macao',
+    id: 'hk_macao_tw',
+    name: '港澳台',
+    nameEn: 'HK, Macao & Taiwan',
     sortOrder: 8,
     themeColor: '#E74C3C',
-    cityIds: ['hongkong', 'macao'],
+    cityIds: ['hongkong', 'macao', 'taipei'],
   },
 ]
 
