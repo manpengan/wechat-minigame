@@ -105,6 +105,38 @@ function placePieces(piecePool, levelPreset, rng) {
   return placedPieces
 }
 
+export function generateBoardFromDefinition({
+  boardId,
+  cityId,
+  levelId,
+  seed,
+  elements,
+  levelPreset,
+  extraState = {},
+}) {
+  const effectiveSeed = seed ?? levelPreset.seedBase
+  const rng = createRng(effectiveSeed)
+  const selectedElements = [...elements]
+  const counts = normalizePiecesPerElement(levelPreset.piecesPerElement, levelPreset.elementCount)
+  const piecePool = createPiecePool(selectedElements, counts)
+  const pieces = placePieces(shuffleWithRng(piecePool, rng), levelPreset, rng)
+  const overlapGraph = buildOverlapGraph(pieces)
+  const boardState = {
+    boardId: boardId ?? `${cityId}-${levelId}-${effectiveSeed}`,
+    cityId,
+    levelId,
+    seed: effectiveSeed,
+    pieces,
+    overlapGraph,
+    metrics: {},
+    ...extraState,
+  }
+
+  boardState.metrics = evaluateBoard(boardState, levelPreset)
+
+  return boardState
+}
+
 export function generateBoard({ cityId, levelId, seed, contentSystem }) {
   const city = contentSystem.getCity(cityId)
   const levelPreset = contentSystem.getLevelPreset(cityId, levelId)
@@ -116,23 +148,14 @@ export function generateBoard({ cityId, levelId, seed, contentSystem }) {
   const effectiveSeed = seed ?? levelPreset.seedBase
   const rng = createRng(effectiveSeed)
   const selectedElements = pickElements(city, levelPreset, rng)
-  const counts = normalizePiecesPerElement(levelPreset.piecesPerElement, levelPreset.elementCount)
-  const piecePool = createPiecePool(selectedElements, counts)
-  const pieces = placePieces(shuffleWithRng(piecePool, rng), levelPreset, rng)
-  const overlapGraph = buildOverlapGraph(pieces)
-  const boardState = {
-    boardId: `${cityId}-${levelId}-${effectiveSeed}`,
+
+  return generateBoardFromDefinition({
     cityId,
     levelId,
     seed: effectiveSeed,
-    pieces,
-    overlapGraph,
-    metrics: {},
-  }
-
-  boardState.metrics = evaluateBoard(boardState, levelPreset)
-
-  return boardState
+    elements: selectedElements,
+    levelPreset,
+  })
 }
 
 export default generateBoard

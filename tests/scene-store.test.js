@@ -118,7 +118,125 @@ test('scene store opens the gift zone and switches between MVP tabs', () => {
   assert.equal(switched, true)
   assert.equal(sceneStore.getScene().selectedTab, 'stamps')
 
+  const switchedToCats = sceneStore.selectGiftTab('cats')
+
+  assert.equal(switchedToCats, true)
+  assert.equal(sceneStore.getScene().selectedTab, 'cats')
+
   sceneStore.goBack()
 
   assert.equal(sceneStore.getScene().type, 'home-select')
+})
+
+test('scene store opens city team selection and locks the first chosen team', () => {
+  const contentSystem = createContentSystem()
+  const playerState = createDefaultPlayerState()
+  const sceneStore = createSceneStore({
+    contentSystem,
+    playerState,
+    now: () => new Date('2026-03-29T08:00:00.000Z').getTime(),
+  })
+
+  const opened = sceneStore.openCityTeamSelect()
+
+  assert.equal(opened, true)
+  assert.equal(sceneStore.getScene().type, 'city-team-select')
+  assert.deepEqual(sceneStore.getScene().options.map((entry) => entry.cityId), ['beijing'])
+
+  const selected = sceneStore.chooseCityTeam('beijing')
+
+  assert.equal(selected, true)
+  assert.deepEqual(playerState.cityTeam, {
+    teamCityId: 'beijing',
+    joinedDate: '2026-03-29T08:00:00.000Z',
+    lastSwitchDate: null,
+  })
+  assert.equal(sceneStore.getScene().type, 'home-select')
+
+  sceneStore.openCityTeamSelect()
+  const reselected = sceneStore.chooseCityTeam('beijing')
+
+  assert.equal(reselected, false)
+  assert.equal(playerState.cityTeam.teamCityId, 'beijing')
+})
+
+test('scene store opens mashup gameplay after two completed cities', () => {
+  const contentSystem = createContentSystem()
+  const playerState = createDefaultPlayerState()
+  const sceneStore = createSceneStore({
+    contentSystem,
+    playerState,
+    now: () => 33001,
+  })
+
+  playerState.unlockedCities.push('tokyo')
+  playerState.levelProgress.beijing = {
+    1: { completed: true, stars: 3 },
+    2: { completed: true, stars: 3 },
+    3: { completed: true, stars: 3 },
+    4: { completed: true, stars: 3 },
+    5: { completed: true, stars: 3 },
+    6: { completed: true, stars: 3 },
+  }
+  playerState.levelProgress.tokyo = {
+    1: { completed: true, stars: 3 },
+    2: { completed: true, stars: 3 },
+    3: { completed: true, stars: 3 },
+    4: { completed: true, stars: 3 },
+    5: { completed: true, stars: 3 },
+    6: { completed: true, stars: 3 },
+  }
+
+  const opened = sceneStore.openHomeTile('mashup')
+
+  assert.deepEqual(opened, { opened: true })
+  assert.equal(sceneStore.getScene().type, 'gameplay')
+  assert.equal(sceneStore.getScene().mode, 'mashup')
+  assert.deepEqual(sceneStore.getScene().sourceCityIds, ['beijing', 'tokyo'])
+})
+
+test('scene store awards a deterministic local mashup reward', () => {
+  const contentSystem = createContentSystem()
+  const playerState = createDefaultPlayerState()
+  const sceneStore = createSceneStore({
+    contentSystem,
+    playerState,
+    now: () => 33001,
+  })
+
+  playerState.unlockedCities.push('tokyo')
+  playerState.levelProgress.beijing = {
+    1: { completed: true, stars: 3 },
+    2: { completed: true, stars: 3 },
+    3: { completed: true, stars: 3 },
+    4: { completed: true, stars: 3 },
+    5: { completed: true, stars: 3 },
+    6: { completed: true, stars: 3 },
+  }
+  playerState.levelProgress.tokyo = {
+    1: { completed: true, stars: 3 },
+    2: { completed: true, stars: 3 },
+    3: { completed: true, stars: 3 },
+    4: { completed: true, stars: 3 },
+    5: { completed: true, stars: 3 },
+    6: { completed: true, stars: 3 },
+  }
+
+  sceneStore.openHomeTile('mashup')
+  const reward = sceneStore.completeGameplayVictory()
+
+  assert.deepEqual(reward, {
+    type: 'magnet',
+    magnetId: 'magnet_beijing_2',
+    cityId: 'beijing',
+    levelId: 2,
+  })
+  assert.deepEqual(playerState.collectedMagnets, [
+    {
+      magnetId: 'magnet_beijing_2',
+      cityId: 'beijing',
+      levelId: 2,
+      acquiredDate: '1970-01-01T00:00:33.001Z',
+    },
+  ])
 })

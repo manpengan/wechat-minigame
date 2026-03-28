@@ -129,18 +129,24 @@ test('content system summarizes MVP gift albums and per-city progress', () => {
     cityId: 'beijing',
     acquiredDate: '2026-03-29T00:00:00.000Z',
   })
+  playerState.collectedCats.push('beijing')
 
   const albums = contentSystem.getGiftAlbums(playerState)
   const magnetEntries = contentSystem.getGiftAlbumEntries('magnets', playerState)
   const stampEntries = contentSystem.getGiftAlbumEntries('stamps', playerState)
+  const catEntries = contentSystem.getGiftAlbumEntries('cats', playerState)
 
-  assert.deepEqual(albums.map((album) => album.id), ['magnets', 'stamps'])
-  assert.deepEqual(albums.map((album) => album.collectedCount), [1, 1])
-  assert.deepEqual(albums.map((album) => album.totalCount), [36, 6])
+  assert.deepEqual(albums.map((album) => album.id), ['magnets', 'stamps', 'cats'])
+  assert.deepEqual(albums.map((album) => album.collectedCount), [1, 1, 1])
+  assert.deepEqual(albums.map((album) => album.totalCount), [36, 6, 6])
   assert.equal(magnetEntries[0].cityId, 'beijing')
   assert.equal(magnetEntries[0].collectedCount, 1)
   assert.equal(magnetEntries[0].totalCount, 6)
   assert.equal(stampEntries[0].cityId, 'beijing')
   assert.equal(stampEntries[0].isCollected, true)
   assert.equal(stampEntries[1].isCollected, false)
+  assert.equal(catEntries[0].cityId, 'beijing')
+  assert.equal(catEntries[0].catName, '京京')
+  assert.equal(catEntries[0].isCollected, true)
+  assert.equal(catEntries[1].isCollected, false)
 })

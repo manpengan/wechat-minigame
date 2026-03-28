@@ -223,10 +223,15 @@ function drawSidebarCard({ x, y, width, height, titleLines, subtitle, onTap, acc
 }
 
 function drawHomeScene() {
+  const playerStateSnapshot = sceneStore.getPlayerState()
   drawHeader('城市抓猫猫', '世界主页面 · 3×3 入口')
 
-  const homeTiles = contentSystem.getHomeTiles(sceneStore.getPlayerState())
-  const playerGiftAlbums = contentSystem.getGiftAlbums(sceneStore.getPlayerState())
+  const homeTiles = contentSystem.getHomeTiles(playerStateSnapshot)
+  const playerGiftAlbums = contentSystem.getGiftAlbums(playerStateSnapshot)
+  const teamCity = playerStateSnapshot.cityTeam?.teamCityId
+    ? contentSystem.getCity(playerStateSnapshot.cityTeam.teamCityId)
+    : null
+  const totalGiftCount = playerGiftAlbums.reduce((sum, album) => sum + album.collectedCount, 0)
   const sidebarWidth = Math.max(58, Math.min(70, Math.floor(windowWidth * 0.18)))
   const sidebarGap = 8
   const centerX = 24 + sidebarWidth + sidebarGap
@@ -270,7 +275,7 @@ function drawHomeScene() {
     width: sidebarWidth,
     height: cardHeight,
     titleLines: ['礼物', '区'],
-    subtitle: `${playerGiftAlbums[0].collectedCount + playerGiftAlbums[1].collectedCount} 个收藏`,
+    subtitle: `${totalGiftCount} 个收藏`,
     accentColor: '#26A69A',
     onTap() {
       sceneStore.openGiftZone()
@@ -284,10 +289,10 @@ function drawHomeScene() {
     width: sidebarWidth,
     height: cardHeight,
     titleLines: ['排行', '榜'],
-    subtitle: '城市战队',
+    subtitle: teamCity ? `${teamCity.display.name} 战队` : '选择战队',
     accentColor: '#42A5F5',
     onTap() {
-      showTransientMessage('城市排行榜依赖服务端，V1.1+ 接入')
+      sceneStore.openCityTeamSelect()
       render()
     },
   })
@@ -483,8 +488,11 @@ function drawGiftZoneScene(scene) {
   const playerStateSnapshot = sceneStore.getPlayerState()
   const albums = contentSystem.getGiftAlbums(playerStateSnapshot)
   const entries = contentSystem.getGiftAlbumEntries(scene.selectedTab, playerStateSnapshot)
+  const teamCity = playerStateSnapshot.cityTeam?.teamCityId
+    ? contentSystem.getCity(playerStateSnapshot.cityTeam.teamCityId)
+    : null
 
-  drawHeader('城市主题礼物区', 'MVP 收集册 · 冰箱贴 / 邮票')
+  drawHeader('城市主题礼物区', 'MVP 收集册 · 冰箱贴 / 邮票 / 猫猫')
 
   const summaryX = 24
   const summaryY = 92
@@ -507,8 +515,50 @@ function drawGiftZoneScene(scene) {
     summaryY + summaryHeight / 2,
   )
 
-  const tabWidth = (windowWidth - 24 * 2 - 12) / 2
-  const tabsY = 158
+  const teamCardY = 156
+  const teamCardHeight = 58
+
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeStyle = teamCity ? teamCity.display.bgColor : '#8aa3ff'
+  ctx.lineWidth = 2
+  drawRoundedRect(summaryX, teamCardY, summaryWidth, teamCardHeight, 16)
+  ctx.fill()
+  ctx.stroke()
+
+  ctx.fillStyle = '#231f2a'
+  ctx.font = 'bold 15px sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText(
+    teamCity ? `${teamCity.display.name} 战队` : '还没加入城市战队',
+    summaryX + 16,
+    teamCardY + 22,
+  )
+
+  ctx.fillStyle = '#6b6474'
+  ctx.font = '12px sans-serif'
+  ctx.fillText(
+    teamCity ? '本地已锁定，排行榜继续占位' : '先选已解锁城市，本地状态先走通',
+    summaryX + 16,
+    teamCardY + 42,
+  )
+
+  drawButton({
+    x: summaryX + summaryWidth - 116,
+    y: teamCardY + 12,
+    width: 100,
+    height: 34,
+    label: teamCity ? '查看战队' : '选择战队',
+    onTap() {
+      sceneStore.openCityTeamSelect()
+      render()
+    },
+    fillStyle: teamCity ? teamCity.display.bgColor : '#231f2a',
+    textColor: '#ffffff',
+  })
+
+  const tabGap = 12
+  const tabWidth = (windowWidth - 24 * 2 - tabGap * (albums.length - 1)) / albums.length
+  const tabsY = 228
 
   albums.forEach((album, index) => {
     drawButton({
@@ -529,7 +579,7 @@ function drawGiftZoneScene(scene) {
   const columns = 2
   const cardWidth = (windowWidth - 24 * 2 - 14) / columns
   const cardHeight = 82
-  const startY = 216
+  const startY = 286
 
   entries.forEach((entry, index) => {
     const row = Math.floor(index / columns)
@@ -553,8 +603,10 @@ function drawGiftZoneScene(scene) {
     ctx.font = '13px sans-serif'
     if (scene.selectedTab === 'magnets') {
       ctx.fillText(`冰箱贴 ${entry.collectedCount}/${entry.totalCount}`, x + 16, y + 52)
-    } else {
+    } else if (scene.selectedTab === 'stamps') {
       ctx.fillText(entry.isCollected ? '邮票已收集' : '邮票未收集', x + 16, y + 52)
+    } else {
+      ctx.fillText(entry.isCollected ? `${entry.catName} 已收集` : '通关城市后收集', x + 16, y + 52)
     }
   })
 
@@ -564,8 +616,73 @@ function drawGiftZoneScene(scene) {
   })
 }
 
+function drawCityTeamSelectScene(scene) {
+  const isLocked = Boolean(scene.selectedTeamCityId)
+  const selectedCity = isLocked ? contentSystem.getCity(scene.selectedTeamCityId) : null
+
+  drawHeader(
+    '选择城市战队',
+    selectedCity ? `当前所属 ${selectedCity.display.name} 战队 · 本地先锁定` : '从已解锁城市里选择一个战队',
+  )
+
+  const columns = 2
+  const cardWidth = (windowWidth - 24 * 2 - 14) / columns
+  const cardHeight = 94
+  const startY = 104
+
+  scene.options.forEach((entry, index) => {
+    const row = Math.floor(index / columns)
+    const column = index % columns
+    const x = 24 + column * (cardWidth + 14)
+    const y = startY + row * (cardHeight + 12)
+    const isSelected = scene.selectedTeamCityId === entry.cityId
+
+    ctx.fillStyle = '#ffffff'
+    ctx.strokeStyle = entry.themeColor
+    ctx.lineWidth = 2
+    drawRoundedRect(x, y, cardWidth, cardHeight, 16)
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.fillStyle = entry.themeColor
+    ctx.font = 'bold 18px sans-serif'
+    ctx.textAlign = 'left'
+    ctx.fillText(entry.cityName, x + 16, y + 24)
+
+    ctx.fillStyle = '#6b6474'
+    ctx.font = '13px sans-serif'
+    ctx.fillText(`猫猫 ${entry.catName}`, x + 16, y + 48)
+    ctx.fillText(isSelected ? '已加入，当前不可更换' : '可加入本地战队', x + 16, y + 72)
+
+    registerHitTarget({
+      x,
+      y,
+      width: cardWidth,
+      height: cardHeight,
+      onTap() {
+        const selected = sceneStore.chooseCityTeam(entry.cityId)
+        if (selected) {
+          savePlayerState()
+          showTransientMessage(`已加入 ${entry.cityName} 战队`)
+        } else if (isLocked) {
+          showTransientMessage('当前版本先锁定首次选队')
+        } else {
+          showTransientMessage('只能选择已解锁城市')
+        }
+        render()
+      },
+    })
+  })
+
+  drawBackButton(() => {
+    sceneStore.goBack()
+    render()
+  })
+}
+
 function drawGameplayScene(scene) {
-  const city = contentSystem.getCity(scene.cityId)
+  const isMashup = scene.mode === 'mashup'
+  const city = isMashup ? null : contentSystem.getCity(scene.cityId)
   const session = scene.session
   const boardState = session.getBoardState()
   const state = session.getState()
@@ -573,10 +690,15 @@ function drawGameplayScene(scene) {
   const activePieces = boardState.pieces
     .filter((piece) => !piece.removed)
     .sort((left, right) => left.layer - right.layer)
+  const elementNameMap = isMashup
+    ? new Map(scene.elementDefinitions.map((element) => [element.elementId, element.name]))
+    : new Map(city.elements.map((element) => [element.id, element.name]))
+  const title = isMashup ? scene.title : `${city.display.name} · 关卡 ${scene.levelId}`
+  const subtitle = isMashup
+    ? `${scene.subtitle ?? '随机混搭'} · ${state.slot.length}/7 槽位`
+    : `${state.slot.length}/7 槽位`
 
-  const elementNameMap = new Map(city.elements.map((element) => [element.id, element.name]))
-
-  drawHeader(`${city.display.name} · 关卡 ${scene.levelId}`, `${state.slot.length}/7 槽位`)
+  drawHeader(title, subtitle)
 
   drawButton({
     x: windowWidth - 112,
@@ -624,11 +746,7 @@ function drawGameplayScene(scene) {
           const result = session.pickPiece(piece.id)
 
           if (result.status === 'won') {
-            sceneStore.completeLevel({
-              cityId: scene.cityId,
-              levelId: scene.levelId,
-              stars: 3,
-            })
+            sceneStore.completeGameplayVictory(3)
             savePlayerState()
           }
 
@@ -668,11 +786,29 @@ function drawGameplayScene(scene) {
   })
 
   if (state.status === 'won' || state.status === 'failed') {
-    drawResultOverlay(state.status, city.display.bgColor)
+    drawResultOverlay(scene, state.status, isMashup ? scene.accentColor : city.display.bgColor)
   }
 }
 
-function drawResultOverlay(status, accentColor) {
+function drawResultOverlay(scene, status, accentColor) {
+  const isMashup = scene.mode === 'mashup'
+  const rewardSummary = scene.rewardSummary
+  const title = status === 'won' ? '通关成功' : '挑战失败'
+  let detail = '可以重开当前关卡，继续测试核心循环'
+
+  if (status === 'won' && isMashup) {
+    if (rewardSummary?.type === 'magnet') {
+      const rewardCity = contentSystem.getCity(rewardSummary.cityId)
+      detail = `奖励：${rewardCity?.display.name ?? rewardSummary.cityId} 冰箱贴 ${rewardSummary.levelId}`
+    } else if (rewardSummary?.type === 'inventory') {
+      detail = '奖励：Shuffle +1'
+    } else {
+      detail = '已结算本地混战奖励'
+    }
+  } else if (status === 'won') {
+    detail = '已记录进度，返回关卡页继续'
+  }
+
   ctx.fillStyle = 'rgba(35, 31, 42, 0.45)'
   ctx.fillRect(0, 0, windowWidth, windowHeight)
 
@@ -691,22 +827,18 @@ function drawResultOverlay(status, accentColor) {
   ctx.fillStyle = '#231f2a'
   ctx.font = 'bold 28px sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText(status === 'won' ? '通关成功' : '挑战失败', x + boxWidth / 2, y + 48)
+  ctx.fillText(title, x + boxWidth / 2, y + 48)
 
   ctx.fillStyle = '#6b6474'
   ctx.font = '15px sans-serif'
-  ctx.fillText(
-    status === 'won' ? '已记录进度，返回关卡页继续' : '可以重开当前关卡，继续测试核心循环',
-    x + boxWidth / 2,
-    y + 86,
-  )
+  ctx.fillText(detail, x + boxWidth / 2, y + 86)
 
   drawButton({
     x: x + 20,
     y: y + 120,
     width: (boxWidth - 50) / 2,
     height: 42,
-    label: status === 'won' ? '返回关卡' : '返回',
+    label: status === 'won' ? (isMashup ? '返回主页' : '返回关卡') : '返回',
     onTap() {
       sceneStore.goBack()
       render()
@@ -720,10 +852,14 @@ function drawResultOverlay(status, accentColor) {
     y: y + 120,
     width: (boxWidth - 50) / 2,
     height: 42,
-    label: status === 'won' ? '下一步再做' : '重新挑战',
+    label: status === 'won' ? (isMashup ? '再来一局' : '下一步再做') : '重新挑战',
     onTap() {
       if (status === 'won') {
-        sceneStore.goBack()
+        if (isMashup) {
+          sceneStore.restartCurrentLevel()
+        } else {
+          sceneStore.goBack()
+        }
       } else {
         sceneStore.restartCurrentLevel()
       }
@@ -782,6 +918,12 @@ function render() {
 
   if (scene.type === 'gift-zone') {
     drawGiftZoneScene(scene)
+    drawTransientMessage()
+    return
+  }
+
+  if (scene.type === 'city-team-select') {
+    drawCityTeamSelectScene(scene)
     drawTransientMessage()
     return
   }

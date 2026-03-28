@@ -44,6 +44,7 @@ export function createContentSystem() {
   const giftAlbumDefinitions = [
     { id: 'magnets', name: '冰箱贴册' },
     { id: 'stamps', name: '邮票册' },
+    { id: 'cats', name: '猫猫册' },
   ]
 
   function getCompletedCityCount(playerState) {
@@ -115,6 +116,35 @@ export function createContentSystem() {
     })
   }
 
+  function getCatEntries(playerState) {
+    const collectedCats = new Set(playerState.collectedCats ?? [])
+
+    return cityRegistry.getAllCities().map((city) => ({
+      cityId: city.id,
+      cityName: city.display.name,
+      cityNameEn: city.display.nameEn,
+      themeColor: city.display.bgColor,
+      catId: city.cat.id,
+      catName: city.cat.name,
+      catThumb: city.cover.catThumb,
+      isCollected: collectedCats.has(city.id),
+    }))
+  }
+
+  function summarizeAlbumEntries(albumId, entries) {
+    if (albumId === 'magnets') {
+      return {
+        collectedCount: entries.reduce((sum, entry) => sum + entry.collectedCount, 0),
+        totalCount: entries.reduce((sum, entry) => sum + entry.totalCount, 0),
+      }
+    }
+
+    return {
+      collectedCount: entries.filter((entry) => entry.isCollected).length,
+      totalCount: entries.length,
+    }
+  }
+
   function getGiftAlbumEntries(albumId, playerState) {
     if (albumId === 'magnets') {
       return getMagnetEntries(playerState)
@@ -124,23 +154,22 @@ export function createContentSystem() {
       return getStampEntries(playerState)
     }
 
+    if (albumId === 'cats') {
+      return getCatEntries(playerState)
+    }
+
     return []
   }
 
   function getGiftAlbums(playerState) {
     return giftAlbumDefinitions.map((definition) => {
       const entries = getGiftAlbumEntries(definition.id, playerState)
-      const collectedCount = definition.id === 'magnets'
-        ? entries.reduce((sum, entry) => sum + entry.collectedCount, 0)
-        : entries.filter((entry) => entry.isCollected).length
-      const totalCount = definition.id === 'magnets'
-        ? entries.reduce((sum, entry) => sum + entry.totalCount, 0)
-        : entries.length
+      const summary = summarizeAlbumEntries(definition.id, entries)
 
       return {
         ...definition,
-        collectedCount,
-        totalCount,
+        collectedCount: summary.collectedCount,
+        totalCount: summary.totalCount,
       }
     })
   }

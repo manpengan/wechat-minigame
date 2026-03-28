@@ -1,4 +1,5 @@
 import { createGameSession } from '../gameplay/session/index.js'
+import { generateMashupBoard } from '../gameplay/difficulty/index.js'
 
 function createHomeSelectScene() {
   return {
@@ -17,6 +18,41 @@ function createGiftZoneScene(selectedTab = 'magnets') {
   return {
     type: 'gift-zone',
     selectedTab,
+  }
+}
+
+function createCityTeamSelectScene(options, selectedTeamCityId) {
+  return {
+    type: 'city-team-select',
+    options,
+    selectedTeamCityId,
+  }
+}
+
+function createGameplayScene({
+  cityId,
+  levelId,
+  session,
+  mode = 'city',
+  title = null,
+  subtitle = null,
+  accentColor = null,
+  sourceCityIds = [],
+  elementDefinitions = [],
+  rewardSummary = null,
+}) {
+  return {
+    type: 'gameplay',
+    cityId,
+    levelId,
+    session,
+    mode,
+    title,
+    subtitle,
+    accentColor,
+    sourceCityIds,
+    elementDefinitions,
+    rewardSummary,
   }
 }
 
@@ -57,6 +93,35 @@ function createAcquiredDate(now) {
   return new Date(now()).toISOString()
 }
 
+function createCityTeamOptions(contentSystem, playerState) {
+  return playerState.unlockedCities
+    .map((cityId) => {
+      const city = contentSystem.getCity(cityId)
+      if (!city) {
+        return null
+      }
+
+      return {
+        cityId: city.id,
+        cityName: city.display.name,
+        catName: city.cat.name,
+        themeColor: city.display.bgColor,
+      }
+    })
+    .filter(Boolean)
+}
+
+function createMashupRewardCandidates(contentSystem, playerState) {
+  return playerState.unlockedCities
+    .map((cityId) => contentSystem.getCity(cityId))
+    .filter(Boolean)
+    .flatMap((city) => city.levelPresets.map((preset) => ({
+      magnetId: `magnet_${city.id}_${preset.id}`,
+      cityId: city.id,
+      levelId: preset.id,
+    })))
+}
+
 function awardLevelMagnet(playerState, cityId, levelId, now) {
   const magnets = ensureCollection(playerState, 'collectedMagnets')
   const magnetId = `magnet_${cityId}_${levelId}`
@@ -71,6 +136,41 @@ function awardLevelMagnet(playerState, cityId, levelId, now) {
     levelId,
     acquiredDate: createAcquiredDate(now),
   })
+}
+
+function awardMashupReward(contentSystem, playerState, seed, now) {
+  const rewardCandidates = createMashupRewardCandidates(contentSystem, playerState)
+  const magnets = ensureCollection(playerState, 'collectedMagnets')
+
+  if (rewardCandidates.length === 0) {
+    playerState.inventory.shuffle = (playerState.inventory.shuffle ?? 0) + 1
+    return {
+      type: 'inventory',
+      itemId: 'shuffle',
+      amount: 1,
+    }
+  }
+
+  const reward = rewardCandidates[seed % rewardCandidates.length]
+
+  if (magnets.some((entry) => entry.magnetId === reward.magnetId)) {
+    playerState.inventory.shuffle = (playerState.inventory.shuffle ?? 0) + 1
+    return {
+      type: 'inventory',
+      itemId: 'shuffle',
+      amount: 1,
+    }
+  }
+
+  magnets.push({
+    ...reward,
+    acquiredDate: createAcquiredDate(now),
+  })
+
+  return {
+    type: 'magnet',
+    ...reward,
+  }
 }
 
 function markCityCompletion(contentSystem, playerState, cityId, now) {
@@ -105,6 +205,40 @@ export function createSceneStore({ contentSystem, playerState, now = () => Date.
   const history = []
   let currentScene = createHomeSelectScene()
 
+  function createMashupSession(seed = now()) {
+    const boardState = generateMashupBoard({
+      cityIds: playerState.unlockedCities,
+      seed,
+      contentSystem,
+    })
+
+    return createGameSession({
+      cityId: 'mashup',
+      levelId: 1,
+      seed,
+      contentSystem,
+      boardState,
+      restartFactory: (nextSeed) => createMashupSession(nextSeed),
+    })
+  }
+
+  function createMashupGameplayScene(seed = now()) {
+    const session = createMashupSession(seed)
+    const boardState = session.getBoardState()
+
+    return createGameplayScene({
+      cityId: 'mashup',
+      levelId: 1,
+      session,
+      mode: 'mashup',
+      title: '主题大混战',
+      subtitle: `${boardState.sourceCityIds.length} 城混搭`,
+      accentColor: '#E74C3C',
+      sourceCityIds: boardState.sourceCityIds ?? [],
+      elementDefinitions: boardState.elementDefinitions ?? [],
+    })
+  }
+
   function getScene() {
     return currentScene
   }
@@ -130,7 +264,9 @@ export function createSceneStore({ contentSystem, playerState, now = () => Date.
     }
 
     if (tile.id === 'mashup') {
-      return { opened: false, reason: 'mode-unavailable' }
+      history.push(currentScene)
+      currentScene = createMashupGameplayScene()
+      return { opened: true }
     }
 
     return { opened: false, reason: 'unavailable' }
@@ -167,7 +303,7 @@ export function createSceneStore({ contentSystem, playerState, now = () => Date.
       return false
     }
 
-    if (!['magnets', 'stamps'].includes(tabId)) {
+    if (!['magnets', 'stamps', 'cats'].includes(tabId)) {
       return false
     }
 
@@ -176,6 +312,40 @@ export function createSceneStore({ contentSystem, playerState, now = () => Date.
       selectedTab: tabId,
     }
 
+    return true
+  }
+
+  function openCityTeamSelect() {
+    history.push(currentScene)
+    currentScene = createCityTeamSelectScene(
+      createCityTeamOptions(contentSystem, playerState),
+      playerState.cityTeam?.teamCityId ?? null,
+    )
+
+    return true
+  }
+
+  function chooseCityTeam(cityId) {
+    if (currentScene.type !== 'city-team-select') {
+      return false
+    }
+
+    if (playerState.cityTeam?.teamCityId) {
+      return false
+    }
+
+    if (!playerState.unlockedCities.includes(cityId)) {
+      return false
+    }
+
+    playerState.cityTeam = {
+      ...playerState.cityTeam,
+      teamCityId: cityId,
+      joinedDate: createAcquiredDate(now),
+      lastSwitchDate: null,
+    }
+
+    currentScene = history.pop() ?? createHomeSelectScene()
     return true
   }
 
@@ -197,8 +367,7 @@ export function createSceneStore({ contentSystem, playerState, now = () => Date.
     }
 
     history.push(currentScene)
-    currentScene = {
-      type: 'gameplay',
+    currentScene = createGameplayScene({
       cityId,
       levelId,
       session: createGameSession({
@@ -206,7 +375,7 @@ export function createSceneStore({ contentSystem, playerState, now = () => Date.
         levelId,
         contentSystem,
       }),
-    }
+    })
 
     return true
   }
@@ -246,6 +415,33 @@ export function createSceneStore({ contentSystem, playerState, now = () => Date.
     return true
   }
 
+  function completeGameplayVictory(stars = 3) {
+    if (currentScene.type !== 'gameplay') {
+      return null
+    }
+
+    if (currentScene.mode === 'mashup') {
+      const reward = awardMashupReward(contentSystem, playerState, currentScene.session.seed, now)
+      currentScene = {
+        ...currentScene,
+        rewardSummary: reward,
+      }
+      return reward
+    }
+
+    completeLevel({
+      cityId: currentScene.cityId,
+      levelId: currentScene.levelId,
+      stars,
+    })
+
+    return {
+      type: 'city',
+      cityId: currentScene.cityId,
+      levelId: currentScene.levelId,
+    }
+  }
+
   function goBack() {
     if (history.length === 0) {
       currentScene = createHomeSelectScene()
@@ -274,8 +470,11 @@ export function createSceneStore({ contentSystem, playerState, now = () => Date.
     openCity,
     openGiftZone,
     selectGiftTab,
+    openCityTeamSelect,
+    chooseCityTeam,
     openLevel,
     completeLevel,
+    completeGameplayVictory,
     restartCurrentLevel,
     goBack,
   }

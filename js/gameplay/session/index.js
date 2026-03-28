@@ -65,6 +65,7 @@ export function createGameSession({
   seed,
   contentSystem,
   boardState,
+  restartFactory,
 }) {
   const resolvedBoard = boardState ? cloneBoardState(boardState) : generateBoard({ cityId, levelId, seed, contentSystem })
   const state = {
@@ -160,6 +161,10 @@ export function createGameSession({
   }
 
   function restart(nextSeed = seed ?? resolvedBoard.seed) {
+    if (restartFactory) {
+      return restartFactory(nextSeed)
+    }
+
     const freshSession = createGameSession({
       cityId,
       levelId,
